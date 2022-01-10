@@ -1,15 +1,11 @@
 #!/bin/bash
 
 MINGW_REPO="https://github.com/mirror/mingw-w64.git"
-MINGW_COMMIT="7fb7c9f6e401e2bc4393e61a27a68ebccffa1195"
+MINGW_COMMIT="a95307f5b065799b39fab72ca656eeaaa4deaf99"
 
 ffbuild_enabled() {
     [[ $TARGET == win* ]] || return -1
     return 0
-}
-
-ffbuild_dockerstage() {
-    to_df "RUN --mount=src=${SELF},dst=/stage.sh --mount=src=patches/mingw,dst=/patches run_stage /stage.sh"
 }
 
 ffbuild_dockerlayer() {
@@ -25,11 +21,6 @@ ffbuild_dockerbuild() {
     git-mini-clone "$MINGW_REPO" "$MINGW_COMMIT" mingw
     cd mingw
 
-    for patch in /patches/*.patch; do
-        echo "Applying $patch"
-        git am < "$patch"
-    done
-
     cd mingw-w64-headers
 
     unset CFLAGS
@@ -37,8 +28,10 @@ ffbuild_dockerbuild() {
     unset LDFLAGS
     unset PKG_CONFIG_LIBDIR
 
+    GCC_SYSROOT="$(${FFBUILD_CROSS_PREFIX}gcc -print-sysroot)"
+
     local myconf=(
-        --prefix="/usr/$FFBUILD_TOOLCHAIN"
+        --prefix="$GCC_SYSROOT/usr/$FFBUILD_TOOLCHAIN"
         --host="$FFBUILD_TOOLCHAIN"
         --with-default-win32-winnt="0x601"
         --enable-idl
@@ -51,7 +44,7 @@ ffbuild_dockerbuild() {
     cd ../mingw-w64-libraries/winpthreads
 
     local myconf=(
-        --prefix="/usr/$FFBUILD_TOOLCHAIN"
+        --prefix="$GCC_SYSROOT/usr/$FFBUILD_TOOLCHAIN"
         --host="$FFBUILD_TOOLCHAIN"
         --with-pic
         --disable-shared
